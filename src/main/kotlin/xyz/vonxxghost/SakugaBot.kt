@@ -1,19 +1,24 @@
 package xyz.vonxxghost
 
 import com.google.gson.Gson
+import mu.KotlinLogging
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.alsoLogin
+import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.subscribeMessages
 import net.mamoe.mirai.join
+import net.mamoe.mirai.message.GroupMessage
 import net.mamoe.mirai.message.data.MessageChain
-import net.mamoe.mirai.utils.DefaultLogger
 import org.jsoup.Jsoup
+import org.slf4j.LoggerFactory
 import java.net.URL
 
 const val HELP_MSG = """使用指南
 在群里发送sakugabooru的稿件链接，本账号将自动搜索是否存在微博gif数据，如果存在则发送gif地址到群里，不存在就无反应。
 已支持图片发送功能，但经测试上传失败率较高，所以随缘。
 暂无设置功能，不想看到禁言即可。现处于新程序测试阶段，问题较多见怪莫怪。"""
+
+val log = KotlinLogging.logger("sakugaBotMain")
 
 data class SakugaTag(val type: Int, val name: String, val main_name: String)
 data class SakugaWeibo(val weibo_id: String, val img_url: String, val weibo_url: String)
@@ -88,7 +93,12 @@ suspend fun main(args: Array<String>) {
         }
 
         always {
-
+            if (this is GroupMessage) {
+                log.info {
+                    "组[${group.id}][${group.name}]人[${sender.id}][${sender.nameCardOrNick}]: " +
+                            message.contentToString()
+                }
+            }
         }
     }
 
