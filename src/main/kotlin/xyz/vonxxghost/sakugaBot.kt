@@ -6,11 +6,20 @@ import net.mamoe.mirai.alsoLogin
 import net.mamoe.mirai.event.subscribeMessages
 import net.mamoe.mirai.join
 import net.mamoe.mirai.message.data.MessageChain
+import net.mamoe.mirai.utils.DefaultLogger
 import org.jsoup.Jsoup
+import java.net.URL
+
+const val HELP_MSG = """使用指南
+在群里发送sakugabooru的稿件链接，本账号将自动搜索是否存在微博gif数据，如果存在则发送gif地址到群里，不存在就无反应。
+已支持图片发送功能，但经测试上传失败率较高，所以随缘。
+暂无设置功能，不想看到禁言即可。现处于新程序测试阶段，问题较多见怪莫怪。"""
 
 data class SakugaTag(val type: Int, val name: String, val main_name: String)
 data class SakugaWeibo(val weibo_id: String, val img_url: String, val weibo_url: String)
 data class SakugaPost(val id: Long, val source: String?, val tags: List<SakugaTag>, val weibo: SakugaWeibo?)
+
+data class TextAndUrls(val text: String, val urls: List<String>)
 
 fun getPostFromBotAPI(postID: String): String {
     return "https://sakugabot.pw/api/posts/$postID/?format=json"
@@ -35,8 +44,9 @@ fun MessageChain.getPostIDs(): Sequence<String> {
 }
 
 
-fun geneReplyText(message: MessageChain): String {
+fun geneReplyTextAndPicUrl(message: MessageChain): TextAndUrls {
     val replyText = StringBuilder()
+    val urls = mutableListOf<String>()
 
     val postIDs = message.getPostIDs()
     val posts = getBotData(postIDs)
@@ -44,10 +54,13 @@ fun geneReplyText(message: MessageChain): String {
         if (post.weibo != null) {
             val copyright = post.tags.filter { it.type == 3 }.joinToString("，") { it.main_name }
             val artist = post.tags.filter { it.type == 1 }.joinToString("，") { it.main_name }
+            urls.add(post.weibo.img_url)
             replyText.append("${post.id}:\n$copyright ${post.source} $artist\n${post.weibo.img_url}\n")
         }
     }
-    return replyText.trimEnd().toString()
+
+    // gif链接最多只取1个
+    return TextAndUrls(replyText.toString(), urls.take(3))
 }
 
 suspend fun main(args: Array<String>) {
@@ -58,7 +71,24 @@ suspend fun main(args: Array<String>) {
     miraiBot.subscribeMessages {
 
         finding(Regex("sakugabooru.com/post/show/\\d+")) {
-            reply(geneReplyText(message))
+            val dat = geneReplyTextAndPicUrl(message)
+
+            if (dat.text.isNotEmpty()) {
+                reply(dat.text)
+            }
+            for (url in dat.urls) {
+                sendImage(URL(url))
+            }
+        }
+
+        atBot {
+            if ("-h" in message.contentToString()) {
+                reply(HELP_MSG)
+            }
+        }
+
+        always {
+
         }
     }
 
