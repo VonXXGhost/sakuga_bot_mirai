@@ -6,9 +6,7 @@ import net.mamoe.mirai.alsoLogin
 import net.mamoe.mirai.event.subscribeMessages
 import net.mamoe.mirai.join
 import net.mamoe.mirai.message.data.MessageChain
-import net.mamoe.mirai.message.data.PlainText
 import org.jsoup.Jsoup
-import java.time.LocalDateTime
 
 data class SakugaTag(val type: Int, val name: String, val main_name: String)
 data class SakugaWeibo(val weibo_id: String, val img_url: String, val weibo_url: String)
@@ -31,11 +29,9 @@ fun getBotData(postIDs: Sequence<String>): Sequence<SakugaPost> {
 }
 
 fun MessageChain.getPostIDs(): Sequence<String> {
-    println(this.toString())
-    val content = this[PlainText].content
-    println(content)
+    val content = this.contentToString()
     val results = Regex("(?<=post/show/)(\\d+)").findAll(content)
-    return results.map { it.value }
+    return results.map { it.value }.distinct()
 }
 
 
@@ -48,15 +44,15 @@ fun geneReplyText(message: MessageChain): String {
         if (post.weibo != null) {
             val copyright = post.tags.filter { it.type == 3 }.joinToString("，") { it.main_name }
             val artist = post.tags.filter { it.type == 1 }.joinToString("，") { it.main_name }
-            replyText.append("${post.id}:\n$copyright ${post.source}\n$artist\n${post.weibo.img_url}\n")
+            replyText.append("${post.id}:\n$copyright ${post.source} $artist\n${post.weibo.img_url}\n")
         }
     }
     return replyText.trimEnd().toString()
 }
 
-suspend fun main() {
-    val qqId = 1L
-    val password = ""
+suspend fun main(args: Array<String>) {
+    val qqId = args[0].toLong()
+    val password = args[1]
     val miraiBot = Bot(qqId, password).alsoLogin()
 
     miraiBot.subscribeMessages {
