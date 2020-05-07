@@ -7,10 +7,10 @@ import net.mamoe.mirai.alsoLogin
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.subscribeMessages
 import net.mamoe.mirai.join
-import net.mamoe.mirai.message.GroupMessage
+import net.mamoe.mirai.message.GroupMessageEvent
 import net.mamoe.mirai.message.data.MessageChain
+import net.mamoe.mirai.utils.secondsToMillis
 import org.jsoup.Jsoup
-import org.slf4j.LoggerFactory
 import java.net.URL
 
 const val HELP_MSG = """使用指南
@@ -65,13 +65,17 @@ fun geneReplyTextAndPicUrl(message: MessageChain): TextAndUrls {
     }
 
     // gif链接最多只取1个
-    return TextAndUrls(replyText.toString(), urls.take(3))
+    return TextAndUrls(replyText.trim().toString(), urls.take(3))
 }
 
 suspend fun main(args: Array<String>) {
     val qqId = args[0].toLong()
     val password = args[1]
-    val miraiBot = Bot(qqId, password).alsoLogin()
+    val miraiBot = Bot(qqId, password) {
+        heartbeatPeriodMillis = 30.secondsToMillis
+        botLoggerSupplier = { SkgBotLogger("sakugaBotMirai") }
+        networkLoggerSupplier = { SkgBotLogger("sakugaBotMiraiNet") }
+    }.alsoLogin()
 
     miraiBot.subscribeMessages {
 
@@ -93,7 +97,7 @@ suspend fun main(args: Array<String>) {
         }
 
         always {
-            if (this is GroupMessage) {
+            if (this is GroupMessageEvent) {
                 log.info {
                     "组[${group.id}][${group.name}]人[${sender.id}][${sender.nameCardOrNick}]: " +
                             message.contentToString()

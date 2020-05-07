@@ -2,14 +2,14 @@
 <configuration status="OFF" monitorInterval="30">
     <appenders>
         <Console name="Console" target="SYSTEM_OUT">
-            <PatternLayout pattern="[%-5p] [%d{yyyy-MM-dd HH:mm:ss}][%c]: %m"/>
+            <PatternLayout pattern="[%-5p] [%d{yyyy-MM-dd HH:mm:ss}][%c]: %m%n"/>
         </Console>
         <RollingFile name="RollingFileInfo" fileName="./logs/bot.log"
                      filePattern="./logs/bot-%i.log">
             <!--ThresholdFilter :日志输出过滤-->
             <!--level="info" :日志级别,onMatch="ACCEPT" :级别在info之上则接受,onMismatch="DENY" :级别在info之下则拒绝-->
             <ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY"/>
-            <PatternLayout pattern="[%-5p] [%d{yyyy-MM-dd HH:mm:ss}][%c]: %m"/>
+            <PatternLayout pattern="[%-5p][%d{yyyy-MM-dd HH:mm:ss}][%c]: %m%n"/>
             <!-- Policies :日志滚动策略-->
             <Policies>
                 <!-- SizeBasedTriggeringPolicy :文件大小滚动策略-->
@@ -26,16 +26,39 @@
                 <SizeBasedTriggeringPolicy size="5MB"/>
             </Policies>
         </RollingFile>
+        <RollingFile name="RollingFileMiraiAll" fileName="./logs/mirai.log"
+                     filePattern="./logs/mirai-%i.log">
+            <ThresholdFilter level="all" onMatch="ACCEPT" onMismatch="ACCEPT"/>
+            <PatternLayout pattern="[%-5p][%d{yyyy-MM-dd HH:mm:ss}][%c]: %m%n"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10MB"/>
+            </Policies>
+        </RollingFile>
+        <RollingFile name="RollingFileMiraiNet" fileName="./logs/miraiNet.log"
+                     filePattern="./logs/miraiNet-%i.log">
+            <ThresholdFilter level="all" onMatch="ACCEPT" onMismatch="ACCEPT"/>
+            <PatternLayout pattern="[%-5p][%d{yyyy-MM-dd HH:mm:ss}][%c]: %m%n"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10MB"/>
+            </Policies>
+        </RollingFile>
     </appenders>
     <!--然后定义logger，只有定义了logger并引入的appender，appender才会生效-->
     <loggers>
         <!--过滤掉spring和mybatis的一些无用的DEBUG信息-->
         <!--Logger节点用来单独指定日志的形式，name为包路径,比如要为org.springframework包下所有日志指定为INFO级别等。 -->
-        <logger name="xyz.vonxxghost" level="debug"/>
+        <logger name="sakugaBotMain" level="debug">
+            <appender-ref ref="RollingFileInfo"/>
+        </logger>
+        <logger name="sakugaBotMirai" level="all">
+            <appender-ref ref="RollingFileMiraiAll"/>
+        </logger>
+        <logger name="sakugaBotMiraiNet" level="all">
+            <appender-ref ref="RollingFileMiraiNet"/>
+        </logger>
         <!-- Root节点用来指定项目的根日志，如果没有单独指定Logger，那么就会默认使用该Root日志输出 -->
         <root level="all">
             <appender-ref ref="Console"/>
-            <appender-ref ref="RollingFileInfo"/>
             <appender-ref ref="RollingFileError"/>
         </root>
     </loggers>
