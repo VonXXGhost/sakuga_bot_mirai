@@ -1,0 +1,11 @@
+qq:
+  id:
+  password:
+
+mail:
+  enabled:
+  hostName:
+  smtpPort:
+  username:
+  password:
+  emailAdress:

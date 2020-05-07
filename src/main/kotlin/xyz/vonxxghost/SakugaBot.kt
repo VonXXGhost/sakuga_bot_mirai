@@ -5,6 +5,10 @@ import mu.KotlinLogging
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.alsoLogin
 import net.mamoe.mirai.contact.nameCardOrNick
+import net.mamoe.mirai.event.events.BotOfflineEvent
+import net.mamoe.mirai.event.events.ImageUploadEvent
+import net.mamoe.mirai.event.events.NewFriendRequestEvent
+import net.mamoe.mirai.event.subscribeAlways
 import net.mamoe.mirai.event.subscribeMessages
 import net.mamoe.mirai.join
 import net.mamoe.mirai.message.GroupMessageEvent
@@ -26,13 +30,11 @@ data class SakugaPost(val id: Long, val source: String?, val tags: List<SakugaTa
 
 data class TextAndUrls(val text: String, val urls: List<String>)
 
-fun getPostFromBotAPI(postID: String): String {
-    return "https://sakugabot.pw/api/posts/$postID/?format=json"
-}
+fun getPostFromBotAPI(postID: String): String =
+    "https://sakugabot.pw/api/posts/$postID/?format=json"
 
-fun getBotData(postIDs: Sequence<String>): Sequence<SakugaPost> {
-
-    return postIDs.map {
+fun getBotData(postIDs: Sequence<String>): Sequence<SakugaPost> =
+    postIDs.map {
         val resp = Jsoup
             .connect(getPostFromBotAPI(it))
             .ignoreContentType(true)
@@ -40,7 +42,7 @@ fun getBotData(postIDs: Sequence<String>): Sequence<SakugaPost> {
             .text()
         return@map Gson().fromJson(resp, SakugaPost::class.java)
     }
-}
+
 
 fun MessageChain.getPostIDs(): Sequence<String> {
     val content = this.contentToString()
@@ -61,6 +63,8 @@ fun geneReplyTextAndPicUrl(message: MessageChain): TextAndUrls {
             val artist = post.tags.filter { it.type == 1 }.joinToString("，") { it.main_name }
             urls.add(post.weibo.img_url)
             replyText.append("${post.id}:\n$copyright ${post.source} $artist\n${post.weibo.img_url}\n")
+        } else {
+            log.info { "Post ${post.id} 微博数据不存在" }
         }
     }
 
@@ -68,9 +72,11 @@ fun geneReplyTextAndPicUrl(message: MessageChain): TextAndUrls {
     return TextAndUrls(replyText.trim().toString(), urls.take(3))
 }
 
-suspend fun main(args: Array<String>) {
-    val qqId = args[0].toLong()
-    val password = args[1]
+suspend fun main() {
+    val config = getConfig()
+    val qqId = config[QqSpec.id]
+    val password = config[QqSpec.password]
+
     val miraiBot = Bot(qqId, password) {
         heartbeatPeriodMillis = 30.secondsToMillis
         botLoggerSupplier = { SkgBotLogger("sakugaBotMirai") }
@@ -104,6 +110,25 @@ suspend fun main(args: Array<String>) {
                 }
             }
         }
+
+    }
+
+    miraiBot.subscribeAlways<ImageUploadEvent.Failed> {
+        log.error { "图片上传失败。${it.message}" }
+    }
+
+    // 离线监控
+    if (config[MailSpec.enabled]) {
+        miraiBot.subscribeAlways<BotOfflineEvent.Dropped> {
+            log.warn { it.cause }
+            sendMailToSelf("bot掉了", it.cause?.message.orEmpty())
+        }
+    }
+
+    // 好友验证
+    miraiBot.subscribeAlways<NewFriendRequestEvent> {
+        it.accept()
+        log.info { "添加好友[${it.fromGroup}(${it.fromGroupId})] by ${it.fromId}: ${it.message}" }
     }
 
     miraiBot.join()

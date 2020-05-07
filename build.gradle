@@ -17,7 +17,7 @@ apply plugin: 'com.github.johnrengelman.shadow'
 apply plugin: 'java'
 
 group 'xyz.vonxxghost'
-version '0.0.1'
+version '0.0.2'
 
 repositories {
     maven { url 'https://dl.bintray.com/kotlin/kotlin-eap' }
@@ -26,7 +26,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'net.mamoe:mirai-core-qqandroid:0.40.0'//此处版本应替换为当前最新
+    implementation 'net.mamoe:mirai-core-qqandroid:1.0-RC'//此处版本应替换为当前最新
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
     testCompile group: 'junit', name: 'junit', version: '4.12'
 
@@ -34,6 +34,8 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.8.6'
     compile 'io.github.microutils:kotlin-logging:1.7.9'
     compile 'org.apache.logging.log4j:log4j-slf4j-impl:2.13.2'
+    compile 'com.uchuhimo:konf:0.22.1'
+    compile group: 'org.apache.commons', name: 'commons-email', version: '1.5'
 }
 
 compileKotlin {
