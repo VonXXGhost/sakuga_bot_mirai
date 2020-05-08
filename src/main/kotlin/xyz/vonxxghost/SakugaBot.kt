@@ -6,6 +6,7 @@ import net.mamoe.mirai.Bot
 import net.mamoe.mirai.alsoLogin
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.events.BotOfflineEvent
+import net.mamoe.mirai.event.events.BotOnlineEvent
 import net.mamoe.mirai.event.events.ImageUploadEvent
 import net.mamoe.mirai.event.events.NewFriendRequestEvent
 import net.mamoe.mirai.event.subscribeAlways
@@ -13,9 +14,12 @@ import net.mamoe.mirai.event.subscribeMessages
 import net.mamoe.mirai.join
 import net.mamoe.mirai.message.GroupMessageEvent
 import net.mamoe.mirai.message.data.MessageChain
-import net.mamoe.mirai.utils.secondsToMillis
+import net.mamoe.mirai.utils.BotConfiguration
 import org.jsoup.Jsoup
+import java.io.EOFException
 import java.net.URL
+import java.util.*
+import kotlin.concurrent.schedule
 
 const val HELP_MSG = """使用指南
 在群里发送sakugabooru的稿件链接，本账号将自动搜索是否存在微博gif数据，如果存在则发送gif地址到群里，不存在就无反应。
@@ -77,13 +81,15 @@ suspend fun main() {
     val qqId = config[QqSpec.id]
     val password = config[QqSpec.password]
 
-    val miraiBot = Bot(qqId, password) {
-        heartbeatPeriodMillis = 30.secondsToMillis
+    val bot = Bot(qqId, password) {
         botLoggerSupplier = { SkgBotLogger("sakugaBotMirai") }
         networkLoggerSupplier = { SkgBotLogger("sakugaBotMiraiNet") }
+        protocol = BotConfiguration.MiraiProtocol.ANDROID_PHONE
     }.alsoLogin()
 
-    miraiBot.subscribeMessages {
+    var isLogin = true
+
+    bot.subscribeMessages {
 
         finding(Regex("sakugabooru.com/post/show/\\d+")) {
             val dat = geneReplyTextAndPicUrl(message)
@@ -110,26 +116,38 @@ suspend fun main() {
                 }
             }
         }
-
     }
 
-    miraiBot.subscribeAlways<ImageUploadEvent.Failed> {
+    bot.subscribeAlways<ImageUploadEvent.Failed> {
         log.error { "图片上传失败。${it.message}" }
     }
 
     // 离线监控
     if (config[MailSpec.enabled]) {
-        miraiBot.subscribeAlways<BotOfflineEvent.Dropped> {
+        bot.subscribeAlways<BotOfflineEvent.Dropped> {
+            if (it.cause is EOFException) {
+                return@subscribeAlways
+            }
+            isLogin = false
             log.warn { it.cause }
-            sendMailToSelf("bot掉了", it.cause?.message.orEmpty())
+            Timer().schedule(5000) {
+                if (!isLogin) {
+                    sendMailToSelf("bot掉了", it.cause?.message.orEmpty())
+                }
+            }
+        }
+
+        bot.subscribeAlways<BotOnlineEvent> {
+            log.debug { "登陆成功" }
+            isLogin = true
         }
     }
 
     // 好友验证
-    miraiBot.subscribeAlways<NewFriendRequestEvent> {
+    bot.subscribeAlways<NewFriendRequestEvent> {
         it.accept()
         log.info { "添加好友[${it.fromGroup}(${it.fromGroupId})] by ${it.fromId}: ${it.message}" }
     }
 
-    miraiBot.join()
+    bot.join()
 }
