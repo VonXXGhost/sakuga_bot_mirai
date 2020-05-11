@@ -1,12 +1,13 @@
 package xyz.vonxxghost
 
 import com.google.gson.Gson
+import kotlinx.coroutines.isActive
 import mu.KotlinLogging
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.alsoLogin
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.events.BotOfflineEvent
-import net.mamoe.mirai.event.events.BotOnlineEvent
+import net.mamoe.mirai.event.events.BotReloginEvent
 import net.mamoe.mirai.event.events.ImageUploadEvent
 import net.mamoe.mirai.event.events.NewFriendRequestEvent
 import net.mamoe.mirai.event.subscribeAlways
@@ -16,7 +17,6 @@ import net.mamoe.mirai.message.GroupMessageEvent
 import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.utils.BotConfiguration
 import org.jsoup.Jsoup
-import java.io.EOFException
 import java.net.URL
 import java.util.*
 import kotlin.concurrent.schedule
@@ -87,8 +87,6 @@ suspend fun main() {
         protocol = BotConfiguration.MiraiProtocol.ANDROID_PHONE
     }.alsoLogin()
 
-    var isLogin = true
-
     bot.subscribeMessages {
 
         finding(Regex("sakugabooru.com/post/show/\\d+")) {
@@ -124,22 +122,26 @@ suspend fun main() {
 
     // 离线监控
     if (config[MailSpec.enabled]) {
-        bot.subscribeAlways<BotOfflineEvent.Dropped> {
-            if (it.cause is EOFException) {
-                return@subscribeAlways
-            }
-            isLogin = false
-            log.warn { it.cause }
-            Timer().schedule(5000) {
-                if (!isLogin) {
-                    sendMailToSelf("bot掉了", it.cause?.message.orEmpty())
+        bot.subscribeAlways<BotOfflineEvent.RequireReconnect> {
+            Timer().schedule(10000) {
+                if (!bot.isActive) {
+                    log.warn { "RequireReconnect.重新登陆失败" }
+                    sendMailToSelf("bot掉了", "")
+                } else {
+                    log.info { "RequireReconnect.重新登陆成功" }
                 }
             }
         }
 
-        bot.subscribeAlways<BotOnlineEvent> {
-            log.debug { "登陆成功" }
-            isLogin = true
+        bot.subscribeAlways<BotOfflineEvent.Dropped> {
+            Timer().schedule(10000) {
+                if (!bot.isActive) {
+                    log.warn(it.cause) { "Dropped.重新登陆失败" }
+                    sendMailToSelf("bot掉了", it.cause?.message.orEmpty())
+                } else {
+                    log.info { "Dropped.重新登陆成功" }
+                }
+            }
         }
     }
 
