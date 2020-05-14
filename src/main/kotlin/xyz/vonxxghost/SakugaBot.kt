@@ -73,15 +73,16 @@ fun updateUpdateDay(): Boolean {
 
 fun getBotData(postIDs: Sequence<String>): Sequence<SakugaPost?> =
     postIDs.map {
-        val resp = Jsoup
-            .connect(getPostFromBotAPI(it))
-            .ignoreContentType(true)
-            .execute()
-        if (resp.statusCode() != 200) {
+        try {
+            val resp = Jsoup
+                .connect(getPostFromBotAPI(it))
+                .ignoreContentType(true)
+                .get()
+                .text()
+            return@map Gson().fromJson(resp, SakugaPost::class.java)
+        } catch (e: Exception) {
             return@map null
         }
-        val text = resp.body()
-        return@map Gson().fromJson(text, SakugaPost::class.java)
     }
 
 
@@ -184,7 +185,7 @@ suspend fun main() {
             }
         }
 
-        case("#随机作画") {
+        contains("#随机作画") {
             if (updateUpdateDay()) {
                 updateLeastPostId() // 每日更新
             }
