@@ -2,6 +2,7 @@ package xyz.vonxxghost
 
 import com.google.gson.Gson
 import kotlinx.coroutines.isActive
+import kotlinx.serialization.json.Json.Default.context
 import mu.KotlinLogging
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.alsoLogin
@@ -16,7 +17,10 @@ import net.mamoe.mirai.join
 import net.mamoe.mirai.message.GroupMessageEvent
 import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.utils.BotConfiguration
+import net.mamoe.mirai.utils.Context
+import net.mamoe.mirai.utils.loadAsDeviceInfo
 import org.jsoup.Jsoup
+import java.io.File
 import java.net.URL
 import java.time.LocalDate
 import java.util.*
@@ -155,6 +159,7 @@ suspend fun main() {
         botLoggerSupplier = { SkgBotLogger("sakugaBotMirai") }
         networkLoggerSupplier = { SkgBotLogger("sakugaBotMiraiNet") }
         protocol = BotConfiguration.MiraiProtocol.ANDROID_PHONE
+        deviceInfo = { File("device.json").loadAsDeviceInfo(it) }
     }.alsoLogin()
 
     bot.subscribeMessages {
@@ -195,10 +200,7 @@ suspend fun main() {
                 val dat = geneReplyTextAndPicUrl(id) ?: continue
 
                 if (dat.text.isNotEmpty()) {
-                    reply("Random-" + dat.text)
-                }
-                for (url in dat.urls) {
-                    sendImage(URL(url))
+                    quoteReply("Random-" + dat.text)
                 }
                 break
             }
