@@ -2,39 +2,45 @@ package xyz.vonxxghost
 
 import com.google.gson.Gson
 import kotlinx.coroutines.isActive
-import kotlinx.serialization.json.Json.Default.context
 import mu.KotlinLogging
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.alsoLogin
 import net.mamoe.mirai.contact.nameCardOrNick
+import net.mamoe.mirai.event.events.BotInvitedJoinGroupRequestEvent
 import net.mamoe.mirai.event.events.BotOfflineEvent
-import net.mamoe.mirai.event.events.BotReloginEvent
 import net.mamoe.mirai.event.events.ImageUploadEvent
 import net.mamoe.mirai.event.events.NewFriendRequestEvent
 import net.mamoe.mirai.event.subscribeAlways
+import net.mamoe.mirai.event.subscribeFriendMessages
+import net.mamoe.mirai.event.subscribeGroupMessages
 import net.mamoe.mirai.event.subscribeMessages
 import net.mamoe.mirai.join
 import net.mamoe.mirai.message.GroupMessageEvent
 import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.utils.BotConfiguration
-import net.mamoe.mirai.utils.Context
 import net.mamoe.mirai.utils.loadAsDeviceInfo
 import org.jsoup.Jsoup
 import java.io.File
 import java.net.URL
 import java.time.LocalDate
 import java.util.*
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.schedule
 import kotlin.random.Random
 
 const val HELP_MSG = """使用指南
 在群里发送sakugabooru的稿件链接，本账号将自动搜索是否存在微博gif数据，如果存在则发送gif地址到群里，不存在就无反应。
 已支持图片发送功能，但经测试上传失败率较高，所以随缘。
+发出带有“#随机作画”的信息时会随机回复。
+bot仅群组有效，全局消息发送限制6条一分钟，超出后不响应。请不要短期大量占用资源。
 暂无设置功能，不想看到禁言即可。现处于新程序测试阶段，问题较多见怪莫怪。"""
 
 val log = KotlinLogging.logger("sakugaBotMain")
 var leastID = 121397L
 var lastUpdateDay = LocalDate.of(2020, 1, 1)
+
+var limitTime = System.currentTimeMillis() / 60000
+val limitCounter = AtomicInteger(0)
 
 data class SakugaTag(val type: Int, val name: String, val main_name: String)
 data class SakugaWeibo(val weibo_id: String, val img_url: String, val weibo_url: String)
@@ -50,6 +56,20 @@ data class SakugaPostSimple(val id: Long)
 data class SakugaPostList(val results: List<SakugaPostSimple>)
 
 data class TextAndUrls(val text: String, val urls: List<String>)
+
+fun checkLimit(): Boolean {
+    val now = System.currentTimeMillis() / 60000
+    if (now == limitTime) {
+        if (limitCounter.incrementAndGet() > 6) {
+            log.info { "超出调用限制。time：$limitTime, counter：$limitCounter" }
+            return false
+        }
+    } else {
+        limitTime = now
+        limitCounter.set(0)
+    }
+    return true
+}
 
 fun getPostFromBotAPI(postID: String): String =
     "https://sakugabot.pw/api/posts/$postID/?format=json"
@@ -139,7 +159,7 @@ fun geneReplyTextAndPicUrl(message: MessageChain): TextAndUrls {
     }
 
     // gif链接最多只取1个
-    return TextAndUrls(replyText.trim().toString(), urls.take(3))
+    return TextAndUrls(replyText.trim().toString(), urls.take(1))
 }
 
 fun getRandomPostId(): Long {
@@ -162,9 +182,13 @@ suspend fun main() {
         deviceInfo = { File("device.json").loadAsDeviceInfo(it) }
     }.alsoLogin()
 
-    bot.subscribeMessages {
+    bot.subscribeGroupMessages {
 
         finding(Regex("sakugabooru.com/post/show/\\d+")) {
+            if (!checkLimit()) {
+                return@finding
+            }
+
             val dat = geneReplyTextAndPicUrl(message)
 
             if (dat.text.isNotEmpty()) {
@@ -176,25 +200,31 @@ suspend fun main() {
         }
 
         atBot {
+            if (!checkLimit()) {
+                return@atBot
+            }
+
             if ("-h" in message.contentToString()) {
                 reply(HELP_MSG)
             }
         }
 
         always {
-            if (this is GroupMessageEvent) {
-                log.info {
-                    "组[${group.id}][${group.name}]人[${sender.id}][${sender.nameCardOrNick}]: " +
-                            message.contentToString()
-                }
+            log.info {
+                "组[${group.id}][${group.name}]人[${sender.id}][${sender.nameCardOrNick}]: " +
+                        message.contentToString()
             }
         }
 
         contains("#随机作画") {
+            if (!checkLimit()) {
+                return@contains
+            }
+
             if (updateUpdateDay()) {
                 updateLeastPostId() // 每日更新
             }
-            for (i in 0..10) {
+            for (i in 0..5) {
                 val id = getRandomPostId()
                 log.info { "随机尝试id：$id" }
                 val dat = geneReplyTextAndPicUrl(id) ?: continue
@@ -240,6 +270,18 @@ suspend fun main() {
     bot.subscribeAlways<NewFriendRequestEvent> {
         it.accept()
         log.info { "添加好友[${it.fromGroup}(${it.fromGroupId})] by ${it.fromId}: ${it.message}" }
+    }
+
+    // 群邀请
+    bot.subscribeAlways<BotInvitedJoinGroupRequestEvent> {
+        it.accept()
+        log.info { "被邀请加入群${it.groupId} by ${it.invitorId}" }
+    }
+
+    bot.subscribeFriendMessages {
+        always {
+            reply("本bot现不支持私聊信息处理。")
+        }
     }
 
     bot.join()
