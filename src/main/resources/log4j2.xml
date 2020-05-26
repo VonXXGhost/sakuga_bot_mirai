@@ -47,7 +47,7 @@
     <loggers>
         <!--过滤掉spring和mybatis的一些无用的DEBUG信息-->
         <!--Logger节点用来单独指定日志的形式，name为包路径,比如要为org.springframework包下所有日志指定为INFO级别等。 -->
-        <logger name="sakugaBotMain" level="debug">
+        <logger name="sakugaBotMain" level="all">
             <appender-ref ref="RollingFileInfo"/>
         </logger>
         <logger name="sakugaBotMirai" level="all">

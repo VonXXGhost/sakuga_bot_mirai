@@ -6,14 +6,11 @@ import mu.KotlinLogging
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.alsoLogin
 import net.mamoe.mirai.contact.nameCardOrNick
+import net.mamoe.mirai.event.*
 import net.mamoe.mirai.event.events.BotInvitedJoinGroupRequestEvent
 import net.mamoe.mirai.event.events.BotOfflineEvent
 import net.mamoe.mirai.event.events.ImageUploadEvent
 import net.mamoe.mirai.event.events.NewFriendRequestEvent
-import net.mamoe.mirai.event.subscribeAlways
-import net.mamoe.mirai.event.subscribeFriendMessages
-import net.mamoe.mirai.event.subscribeGroupMessages
-import net.mamoe.mirai.event.subscribeMessages
 import net.mamoe.mirai.join
 import net.mamoe.mirai.message.GroupMessageEvent
 import net.mamoe.mirai.message.data.MessageChain
@@ -32,7 +29,7 @@ const val HELP_MSG = """使用指南
 在群里发送sakugabooru的稿件链接，本账号将自动搜索是否存在微博gif数据，如果存在则发送gif地址到群里，不存在就无反应。
 已支持图片发送功能，但经测试上传失败率较高，所以随缘。
 发出带有“#随机作画”的信息时会随机回复。
-bot仅群组有效，全局消息发送限制6条一分钟，超出后不响应。请不要短期大量占用资源。
+bot仅群组有效，全局消息发送限制4条一分钟，超出后不响应。请不要短期大量占用资源。
 暂无设置功能，不想看到禁言即可。现处于新程序测试阶段，问题较多见怪莫怪。"""
 
 val log = KotlinLogging.logger("sakugaBotMain")
@@ -59,8 +56,9 @@ data class TextAndUrls(val text: String, val urls: List<String>)
 
 fun checkLimit(): Boolean {
     val now = System.currentTimeMillis() / 60000
+    log.trace { "limitTime:$limitTime, now:$now, counter:$limitCounter" }
     if (now == limitTime) {
-        if (limitCounter.incrementAndGet() > 6) {
+        if (limitCounter.incrementAndGet() > 4) {
             log.info { "超出调用限制。time：$limitTime, counter：$limitCounter" }
             return false
         }
@@ -243,7 +241,7 @@ suspend fun main() {
 
     // 离线监控
     if (config[MailSpec.enabled]) {
-        bot.subscribeAlways<BotOfflineEvent.RequireReconnect> {
+        bot.subscribeAlways<BotOfflineEvent.RequireReconnect>(priority = EventPriority.HIGHEST) {
             Timer().schedule(10000) {
                 if (!bot.isActive) {
                     log.warn { "RequireReconnect.重新登陆失败" }
@@ -254,7 +252,7 @@ suspend fun main() {
             }
         }
 
-        bot.subscribeAlways<BotOfflineEvent.Dropped> {
+        bot.subscribeAlways<BotOfflineEvent.Dropped>(priority = EventPriority.HIGHEST) {
             Timer().schedule(10000) {
                 if (!bot.isActive) {
                     log.warn(it.cause) { "Dropped.重新登陆失败" }
@@ -280,6 +278,12 @@ suspend fun main() {
 
     bot.subscribeFriendMessages {
         always {
+            reply("本bot现不支持私聊信息处理。")
+        }
+    }
+
+    bot.subscribeTempMessages {
+        contains("随机作画") {
             reply("本bot现不支持私聊信息处理。")
         }
     }
