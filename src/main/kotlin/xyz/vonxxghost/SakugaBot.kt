@@ -178,6 +178,7 @@ suspend fun main() {
         networkLoggerSupplier = { SkgBotLogger("sakugaBotMiraiNet") }
         protocol = BotConfiguration.MiraiProtocol.ANDROID_PHONE
         deviceInfo = { File("device.json").loadAsDeviceInfo(it) }
+        loginSolver = NotifyLoginSolver()
     }.alsoLogin()
 
     bot.subscribeGroupMessages {
@@ -237,31 +238,6 @@ suspend fun main() {
 
     bot.subscribeAlways<ImageUploadEvent.Failed> {
         log.error { "图片上传失败。${it.message}" }
-    }
-
-    // 离线监控
-    if (config[MailSpec.enabled]) {
-        bot.subscribeAlways<BotOfflineEvent.RequireReconnect>(priority = EventPriority.HIGHEST) {
-            Timer().schedule(10000) {
-                if (!bot.isActive) {
-                    log.warn { "RequireReconnect.重新登陆失败" }
-                    sendMailToSelf("bot掉了", "")
-                } else {
-                    log.info { "RequireReconnect.重新登陆成功" }
-                }
-            }
-        }
-
-        bot.subscribeAlways<BotOfflineEvent.Dropped>(priority = EventPriority.HIGHEST) {
-            Timer().schedule(10000) {
-                if (!bot.isActive) {
-                    log.warn(it.cause) { "Dropped.重新登陆失败" }
-                    sendMailToSelf("bot掉了", it.cause?.message.orEmpty())
-                } else {
-                    log.info { "Dropped.重新登陆成功" }
-                }
-            }
-        }
     }
 
     // 好友验证

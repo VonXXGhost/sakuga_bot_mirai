@@ -17,7 +17,7 @@ apply plugin: 'com.github.johnrengelman.shadow'
 apply plugin: 'java'
 
 group 'xyz.vonxxghost'
-version '0.0.7'
+version '0.0.8'
 
 repositories {
     maven { url 'https://dl.bintray.com/kotlin/kotlin-eap' }
