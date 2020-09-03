@@ -1,0 +1,11 @@
+qq:
+  id:
+  password:
+
+mail:
+  enabled: true
+  hostName: smtp.qq.com
+  smtpPort: 587
+  username:
+  password:
+  emailAddress:

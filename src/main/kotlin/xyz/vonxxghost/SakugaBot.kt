@@ -1,18 +1,20 @@
 package xyz.vonxxghost
 
 import com.google.gson.Gson
-import kotlinx.coroutines.isActive
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonConfiguration
 import mu.KotlinLogging
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.alsoLogin
 import net.mamoe.mirai.contact.nameCardOrNick
-import net.mamoe.mirai.event.*
 import net.mamoe.mirai.event.events.BotInvitedJoinGroupRequestEvent
-import net.mamoe.mirai.event.events.BotOfflineEvent
 import net.mamoe.mirai.event.events.ImageUploadEvent
 import net.mamoe.mirai.event.events.NewFriendRequestEvent
+import net.mamoe.mirai.event.subscribeAlways
+import net.mamoe.mirai.event.subscribeFriendMessages
+import net.mamoe.mirai.event.subscribeGroupMessages
+import net.mamoe.mirai.event.subscribeTempMessages
 import net.mamoe.mirai.join
-import net.mamoe.mirai.message.GroupMessageEvent
 import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.utils.BotConfiguration
 import net.mamoe.mirai.utils.loadAsDeviceInfo
@@ -20,20 +22,18 @@ import org.jsoup.Jsoup
 import java.io.File
 import java.net.URL
 import java.time.LocalDate
-import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.concurrent.schedule
 import kotlin.random.Random
 
 const val HELP_MSG = """使用指南
 在群里发送sakugabooru的稿件链接，本账号将自动搜索是否存在微博gif数据，如果存在则发送gif地址到群里，不存在就无反应。
-已支持图片发送功能，但经测试上传失败率较高，所以随缘。
+已支持图片发送功能。
 发出带有“#随机作画”的信息时会随机回复。
 bot仅群组有效，全局消息发送限制4条一分钟，超出后不响应。请不要短期大量占用资源。
-暂无设置功能，不想看到禁言即可。现处于新程序测试阶段，问题较多见怪莫怪。"""
+暂无设置功能，不想看到禁言即可。"""
 
 val log = KotlinLogging.logger("sakugaBotMain")
-var leastID = 121397L
+var leastID = 131261L
 var lastUpdateDay = LocalDate.of(2020, 1, 1)
 
 var limitTime = System.currentTimeMillis() / 60000
@@ -177,7 +177,11 @@ suspend fun main() {
         botLoggerSupplier = { SkgBotLogger("sakugaBotMirai") }
         networkLoggerSupplier = { SkgBotLogger("sakugaBotMiraiNet") }
         protocol = BotConfiguration.MiraiProtocol.ANDROID_PHONE
-        deviceInfo = { File("device.json").loadAsDeviceInfo(it) }
+        deviceInfo =
+            {
+                File("device.json")
+                    .loadAsDeviceInfo(Json { prettyPrint = true })
+            }
         loginSolver = NotifyLoginSolver()
     }.alsoLogin()
 
