@@ -1,6 +1,7 @@
 qq:
   id:
   password:
+  protocol:
 
 mail:
   enabled:

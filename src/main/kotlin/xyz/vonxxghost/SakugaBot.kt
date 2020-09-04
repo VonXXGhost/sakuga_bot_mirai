@@ -16,6 +16,7 @@ import net.mamoe.mirai.event.subscribeGroupMessages
 import net.mamoe.mirai.event.subscribeTempMessages
 import net.mamoe.mirai.join
 import net.mamoe.mirai.message.data.MessageChain
+import net.mamoe.mirai.message.sendAsImageTo
 import net.mamoe.mirai.utils.BotConfiguration
 import net.mamoe.mirai.utils.loadAsDeviceInfo
 import org.jsoup.Jsoup
@@ -173,10 +174,15 @@ suspend fun main() {
     val qqId = config[QqSpec.id]
     val password = config[QqSpec.password]
 
+    val PROTOCOL_MAP = mapOf(
+        "pad" to BotConfiguration.MiraiProtocol.ANDROID_PAD,
+        "phone" to BotConfiguration.MiraiProtocol.ANDROID_PHONE
+    )
+
     val bot = Bot(qqId, password) {
         botLoggerSupplier = { SkgBotLogger("sakugaBotMirai") }
         networkLoggerSupplier = { SkgBotLogger("sakugaBotMiraiNet") }
-        protocol = BotConfiguration.MiraiProtocol.ANDROID_PHONE
+        protocol = PROTOCOL_MAP[config[QqSpec.protocol]] ?: error("ERROR protocol")
         deviceInfo =
             {
                 File("device.json")
@@ -198,7 +204,7 @@ suspend fun main() {
                 reply(dat.text)
             }
             for (url in dat.urls) {
-                sendImage(URL(url))
+                URL(url).openConnection().getInputStream().sendAsImage()
             }
         }
 

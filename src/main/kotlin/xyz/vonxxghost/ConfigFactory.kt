@@ -8,6 +8,7 @@ import com.uchuhimo.konf.source.yaml
 object QqSpec : ConfigSpec() {
     val id by required<Long>()
     val password by required<String>()
+    val protocol by optional("phone")
 }
 
 object MailSpec : ConfigSpec() {
