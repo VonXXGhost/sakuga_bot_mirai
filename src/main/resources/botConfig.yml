@@ -12,4 +12,5 @@ mail:
   emailAddress:
 
 net:
+  botHostname:
   port:

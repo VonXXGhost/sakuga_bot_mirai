@@ -21,6 +21,7 @@ object MailSpec : ConfigSpec() {
 }
 
 object NetSpec : ConfigSpec() {
+    val botHostname by optional("localhost")
     val port by optional(4300)
 }
 
