@@ -1,8 +1,8 @@
 package xyz.vonxxghost
 
 import com.google.gson.Gson
+import io.javalin.Javalin
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonConfiguration
 import mu.KotlinLogging
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.alsoLogin
@@ -16,7 +16,6 @@ import net.mamoe.mirai.event.subscribeGroupMessages
 import net.mamoe.mirai.event.subscribeTempMessages
 import net.mamoe.mirai.join
 import net.mamoe.mirai.message.data.MessageChain
-import net.mamoe.mirai.message.sendAsImageTo
 import net.mamoe.mirai.utils.BotConfiguration
 import net.mamoe.mirai.utils.loadAsDeviceInfo
 import org.jsoup.Jsoup
@@ -30,7 +29,7 @@ const val HELP_MSG = """使用指南
 在群里发送sakugabooru的稿件链接，本账号将自动搜索是否存在微博gif数据，如果存在则发送gif地址到群里，不存在就无反应。
 已支持图片发送功能。
 发出带有“#随机作画”的信息时会随机回复。
-bot仅群组有效，全局消息发送限制4条一分钟，超出后不响应。请不要短期大量占用资源。
+bot仅群组有效，全局消息发送限制6条一分钟，超出后不响应。请不要短期大量占用资源。
 暂无设置功能，不想看到禁言即可。"""
 
 val log = KotlinLogging.logger("sakugaBotMain")
@@ -59,7 +58,7 @@ fun checkLimit(): Boolean {
     val now = System.currentTimeMillis() / 60000
     log.trace { "limitTime:$limitTime, now:$now, counter:$limitCounter" }
     if (now == limitTime) {
-        if (limitCounter.incrementAndGet() > 4) {
+        if (limitCounter.incrementAndGet() > 6) {
             log.info { "超出调用限制。time：$limitTime, counter：$limitCounter" }
             return false
         }
@@ -190,6 +189,14 @@ suspend fun main() {
             }
         loginSolver = NotifyLoginSolver()
     }.alsoLogin()
+
+    val server = Javalin.create().start(config[NetSpec.port])
+    server.get("/metrics") { ctx ->
+        run {
+            val metrics = mapOf("isOnline" to bot.isOnline)
+            ctx.result(Gson().toJson(metrics))
+        }
+    }
 
     bot.subscribeGroupMessages {
 

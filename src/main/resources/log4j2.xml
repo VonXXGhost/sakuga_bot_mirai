@@ -13,7 +13,7 @@
             <!-- Policies :日志滚动策略-->
             <Policies>
                 <!-- SizeBasedTriggeringPolicy :文件大小滚动策略-->
-                <SizeBasedTriggeringPolicy size="5MB"/>
+                <SizeBasedTriggeringPolicy size="100MB"/>
             </Policies>
             <!-- DefaultRolloverStrategy属性如不设置，则默认为最多同一文件夹下7个文件，这里设置了20 -->
             <DefaultRolloverStrategy max="5"/>
@@ -31,7 +31,7 @@
             <ThresholdFilter level="all" onMatch="ACCEPT" onMismatch="ACCEPT"/>
             <PatternLayout pattern="[%-5p][%d{yyyy-MM-dd HH:mm:ss}][%c]: %m%n"/>
             <Policies>
-                <SizeBasedTriggeringPolicy size="10MB"/>
+                <SizeBasedTriggeringPolicy size="100MB"/>
             </Policies>
         </RollingFile>
         <RollingFile name="RollingFileMiraiNet" fileName="./logs/miraiNet.log"
@@ -39,7 +39,7 @@
             <ThresholdFilter level="all" onMatch="ACCEPT" onMismatch="ACCEPT"/>
             <PatternLayout pattern="[%-5p][%d{yyyy-MM-dd HH:mm:ss}][%c]: %m%n"/>
             <Policies>
-                <SizeBasedTriggeringPolicy size="10MB"/>
+                <SizeBasedTriggeringPolicy size="100MB"/>
             </Policies>
         </RollingFile>
     </appenders>
@@ -55,6 +55,10 @@
         </logger>
         <logger name="sakugaBotMiraiNet" level="all">
             <appender-ref ref="RollingFileMiraiNet"/>
+        </logger>
+        <logger name="org.eclipse.jetty" level="info">
+            <appender-ref ref="Console"/>
+            <appender-ref ref="RollingFileInfo"/>
         </logger>
         <!-- Root节点用来指定项目的根日志，如果没有单独指定Logger，那么就会默认使用该Root日志输出 -->
         <root level="all">

@@ -10,3 +10,6 @@ mail:
   username:
   password:
   emailAddress:
+
+net:
+  port:

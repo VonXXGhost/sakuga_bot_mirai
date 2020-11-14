@@ -20,10 +20,15 @@ object MailSpec : ConfigSpec() {
     val emailAddress by required<String>()
 }
 
+object NetSpec : ConfigSpec() {
+    val port by optional(4300)
+}
+
 fun getConfig(): Config {
     return Config {
         addSpec(QqSpec)
         addSpec(MailSpec)
+        addSpec(NetSpec)
     }
         .from.yaml.file("botConfig.yml")
         .from.systemProperties()
