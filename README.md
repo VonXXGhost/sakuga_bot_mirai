@@ -7,6 +7,6 @@
 
 ## 编译/启动说明
 
-使用shadowJar编译出封装了依赖的jar包，填写botConfig.yml，应该差不多了。第一次运行会生成device.json文件于同目录>
+使用shadowJar编译出封装了依赖的jar包，填写botConfig.yml，应该差不多了。第一次运行会生成device.json文件于同目录.
 
-监控启动脚本：``java -cp sakugaBot-xxx.jar xyz.vonxxghost.MetricsTaskKt`
+监控启动脚本：`java -cp sakugaBot-xxx.jar xyz.vonxxghost.MetricsTaskKt`

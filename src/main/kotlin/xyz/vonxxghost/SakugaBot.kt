@@ -2,27 +2,29 @@ package xyz.vonxxghost
 
 import com.google.gson.Gson
 import io.javalin.Javalin
+import io.ktor.client.*
+import io.ktor.client.engine.apache.*
+import io.ktor.client.request.*
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging
-import net.mamoe.mirai.Bot
+import net.mamoe.mirai.BotFactory
 import net.mamoe.mirai.alsoLogin
+import net.mamoe.mirai.contact.Contact.Companion.sendImage
 import net.mamoe.mirai.contact.nameCardOrNick
+import net.mamoe.mirai.event.*
 import net.mamoe.mirai.event.events.BotInvitedJoinGroupRequestEvent
 import net.mamoe.mirai.event.events.ImageUploadEvent
 import net.mamoe.mirai.event.events.NewFriendRequestEvent
-import net.mamoe.mirai.event.subscribeAlways
-import net.mamoe.mirai.event.subscribeFriendMessages
-import net.mamoe.mirai.event.subscribeGroupMessages
-import net.mamoe.mirai.event.subscribeTempMessages
-import net.mamoe.mirai.join
 import net.mamoe.mirai.message.data.MessageChain
+import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.utils.BotConfiguration
-import net.mamoe.mirai.utils.loadAsDeviceInfo
+import net.mamoe.mirai.utils.DeviceInfo.Companion.loadAsDeviceInfo
+import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import org.jsoup.Jsoup
 import java.io.File
-import java.net.URL
 import java.time.LocalDate
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.random.Random
 
 const val HELP_MSG = """使用指南
@@ -38,6 +40,20 @@ var lastUpdateDay = LocalDate.of(2020, 1, 1)
 
 var limitTime = System.currentTimeMillis() / 60000
 val limitCounter = AtomicInteger(0)
+
+val httpClient = HttpClient(Apache) {
+    engine {
+        followRedirects = true
+        connectTimeout = 15_000
+        socketTimeout = 30_000
+        connectionRequestTimeout = 15_000
+
+        customizeClient {
+            setMaxConnPerRoute(10)
+            setMaxConnTotal(50)
+        }
+    }
+}
 
 data class SakugaTag(val type: Int, val name: String, val main_name: String)
 data class SakugaWeibo(val weibo_id: String, val img_url: String, val weibo_url: String)
@@ -178,7 +194,7 @@ suspend fun main() {
         "phone" to BotConfiguration.MiraiProtocol.ANDROID_PHONE
     )
 
-    val bot = Bot(qqId, password) {
+    val bot = BotFactory.newBot(qqId, password) {
         botLoggerSupplier = { SkgBotLogger("sakugaBotMirai") }
         networkLoggerSupplier = { SkgBotLogger("sakugaBotMiraiNet") }
         protocol = PROTOCOL_MAP[config[QqSpec.protocol]] ?: error("ERROR protocol")
@@ -187,7 +203,6 @@ suspend fun main() {
                 File("device.json")
                     .loadAsDeviceInfo(Json { prettyPrint = true })
             }
-        loginSolver = NotifyLoginSolver()
     }.alsoLogin()
 
     val server = Javalin.create().start(config[NetSpec.port])
@@ -198,7 +213,7 @@ suspend fun main() {
         }
     }
 
-    bot.subscribeGroupMessages {
+    bot.eventChannel.subscribeGroupMessages {
 
         finding(Regex("sakugabooru.com/post/show/\\d+")) {
             if (!checkLimit()) {
@@ -208,10 +223,13 @@ suspend fun main() {
             val dat = geneReplyTextAndPicUrl(message)
 
             if (dat.text.isNotEmpty()) {
-                reply(dat.text)
+                subject.sendMessage(dat.text)
             }
             for (url in dat.urls) {
-                URL(url).openConnection().getInputStream().sendAsImage()
+                val result = httpClient.get<ByteArray> {
+                    url(url)
+                }
+                subject.sendImage(result.toExternalResource())
             }
         }
 
@@ -221,7 +239,7 @@ suspend fun main() {
             }
 
             if ("-h" in message.contentToString()) {
-                reply(HELP_MSG)
+                subject.sendMessage(HELP_MSG)
             }
         }
 
@@ -246,38 +264,42 @@ suspend fun main() {
                 val dat = geneReplyTextAndPicUrl(id) ?: continue
 
                 if (dat.text.isNotEmpty()) {
-                    quoteReply("Random-" + dat.text)
+                    subject.sendMessage(message.quote() + ("Random-" + dat.text))
                 }
                 break
             }
         }
     }
 
-    bot.subscribeAlways<ImageUploadEvent.Failed> {
+    bot.eventChannel.subscribeAlways<ImageUploadEvent.Failed> {
         log.error { "图片上传失败。${it.message}" }
     }
 
     // 好友验证
-    bot.subscribeAlways<NewFriendRequestEvent> {
+    bot.eventChannel.subscribeAlways<NewFriendRequestEvent> {
         it.accept()
         log.info { "添加好友[${it.fromGroup}(${it.fromGroupId})] by ${it.fromId}: ${it.message}" }
     }
 
     // 群邀请
-    bot.subscribeAlways<BotInvitedJoinGroupRequestEvent> {
+    bot.eventChannel.subscribeAlways<BotInvitedJoinGroupRequestEvent> {
         it.accept()
         log.info { "被邀请加入群${it.groupId} by ${it.invitorId}" }
     }
 
-    bot.subscribeFriendMessages {
+    bot.eventChannel.subscribeFriendMessages {
         always {
-            reply("本bot现不支持私聊信息处理。")
+            subject.sendMessage("本bot现不支持私聊信息处理。")
         }
     }
 
-    bot.subscribeTempMessages {
+    bot.eventChannel.subscribeGroupTempMessages(
+        EmptyCoroutineContext,
+        ConcurrencyKind.CONCURRENT,
+        EventPriority.MONITOR
+    ) {
         contains("随机作画") {
-            reply("本bot现不支持私聊信息处理。")
+            subject.sendMessage("本bot现不支持私聊信息处理。")
         }
     }
 

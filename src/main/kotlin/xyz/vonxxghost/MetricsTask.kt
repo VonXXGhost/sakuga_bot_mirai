@@ -28,6 +28,8 @@ object BotMetricsTask : TimerTask() {
             logger.debug { json.toString() }
             if (json == null || !json.isOnline) {
                 sendMail("Bot貌似挂了", resp)
+            } else if (json.isOnline) {
+                isSended = false
             }
         } catch (e: Exception) {
             logger.error { e }
