@@ -2,9 +2,8 @@ package xyz.vonxxghost
 
 import com.google.gson.Gson
 import io.javalin.Javalin
-import io.ktor.client.*
-import io.ktor.client.engine.apache.*
 import io.ktor.client.request.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
@@ -20,7 +19,6 @@ import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.utils.BotConfiguration
 import net.mamoe.mirai.utils.DeviceInfo.Companion.loadAsDeviceInfo
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
-import org.jsoup.Jsoup
 import java.io.File
 import java.time.LocalDate
 import java.util.concurrent.atomic.AtomicInteger
@@ -41,19 +39,7 @@ var lastUpdateDay = LocalDate.of(2020, 1, 1)
 var limitTime = System.currentTimeMillis() / 60000
 val limitCounter = AtomicInteger(0)
 
-val httpClient = HttpClient(Apache) {
-    engine {
-        followRedirects = true
-        connectTimeout = 15_000
-        socketTimeout = 30_000
-        connectionRequestTimeout = 15_000
-
-        customizeClient {
-            setMaxConnPerRoute(10)
-            setMaxConnTotal(50)
-        }
-    }
-}
+val httpClient = HttpRequest.request
 
 data class SakugaTag(val type: Int, val name: String, val main_name: String)
 data class SakugaWeibo(val weibo_id: String, val img_url: String, val weibo_url: String)
@@ -88,14 +74,10 @@ fun checkLimit(): Boolean {
 fun getPostFromBotAPI(postID: String): String =
     "https://sakugabot.pw/api/posts/$postID/?format=json"
 
-fun updateLeastPostId() {
-    val resp = Jsoup
-        .connect("https://sakugabot.pw/api/posts/?format=json")
-        .ignoreContentType(true)
-        .get()
-        .text()
-    val json = Gson().fromJson(resp, SakugaPostList::class.java)
-    leastID = json.results.first().id
+suspend fun updateLeastPostId() {
+    val resp = httpClient
+        .get<SakugaPostList>("https://sakugabot.pw/api/posts/?format=json")
+    leastID = resp.results.first().id
     log.info { "更新最新ID为$leastID" }
 }
 
@@ -112,13 +94,18 @@ fun updateUpdateDay(): Boolean {
 fun getBotData(postIDs: Sequence<String>): Sequence<SakugaPost?> =
     postIDs.map {
         try {
-            val resp = Jsoup
-                .connect(getPostFromBotAPI(it))
-                .ignoreContentType(true)
-                .get()
-                .text()
-            return@map Gson().fromJson(resp, SakugaPost::class.java)
+            var result: SakugaPost
+            runBlocking {
+                result = httpClient.get(
+                    getPostFromBotAPI(it)
+                )
+            }
+            if (result.weibo == null) {
+                log.info { "Post $it 微博数据不存在" }
+            }
+            return@map result
         } catch (e: Exception) {
+            log.error(e) { "getBotData ERROR" }
             return@map null
         }
     }
@@ -142,7 +129,7 @@ fun geneReplyTextAndPicUrl(id: Long): TextAndUrls? {
     val posts = getBotData(sequenceOf(id.toString()))
     val post = posts.first()
     if (post?.weibo == null) {
-        log.info { "Post ${post?.id} 微博数据不存在" }
+        log.info { "Post $id 微博数据不存在" }
         return null
     }
 
@@ -167,8 +154,6 @@ fun geneReplyTextAndPicUrl(message: MessageChain): TextAndUrls {
             val artist = post.artist()
             urls.add(post.weibo.img_url)
             replyText.append("${post.id}:\n$copyright ${post.source} $artist\n${post.weibo.img_url}\n")
-        } else {
-            log.info { "Post ${post?.id} 微博数据不存在" }
         }
     }
 
@@ -210,6 +195,7 @@ suspend fun main() {
         run {
             val metrics = mapOf("isOnline" to bot.isOnline)
             ctx.result(Gson().toJson(metrics))
+            ctx.contentType("application/json")
         }
     }
 

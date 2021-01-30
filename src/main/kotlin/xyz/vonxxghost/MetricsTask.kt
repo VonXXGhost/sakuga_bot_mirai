@@ -1,35 +1,34 @@
 package xyz.vonxxghost
 
-import com.google.gson.Gson
+import io.ktor.client.request.*
+import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
-import org.jsoup.Jsoup
 import java.util.*
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
+data class BotMetrics(val isOnline: Boolean)
+
 val logger = KotlinLogging.logger("MetricsTask")
 
 val CONFIG = getConfig()
-
-data class BotMetrics(val isOnline: Boolean)
 
 object BotMetricsTask : TimerTask() {
 
     private var isSended = false
 
     override fun run() {
+        val httpClient = HttpRequest.request
         try {
-            val resp = Jsoup
-                .connect("http://${CONFIG[NetSpec.botHostname]}:${CONFIG[NetSpec.port]}/metrics")
-                .ignoreContentType(true)
-                .get()
-                .text()
-            val json = Gson().fromJson(resp, BotMetrics::class.java)
-            logger.debug { json.toString() }
-            if (json == null || !json.isOnline) {
-                sendMail("Bot貌似挂了", resp)
-            } else if (json.isOnline) {
-                isSended = false
+            runBlocking {
+                val resp = httpClient
+                    .get<BotMetrics>("http://${CONFIG[NetSpec.botHostname]}:${CONFIG[NetSpec.port]}/metrics")
+                logger.debug { resp }
+                if (!resp.isOnline) {
+                    sendMail("Bot貌似挂了", resp.toString())
+                } else if (resp.isOnline) {
+                    isSended = false
+                }
             }
         } catch (e: Exception) {
             logger.error { e }
