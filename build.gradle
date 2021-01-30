@@ -17,7 +17,7 @@ apply plugin: 'com.github.johnrengelman.shadow'
 apply plugin: 'java'
 
 group 'xyz.vonxxghost'
-version '0.1.3'
+version '0.1.4'
 
 repositories {
     jcenter()

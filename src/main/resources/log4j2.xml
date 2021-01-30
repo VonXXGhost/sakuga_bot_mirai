@@ -50,6 +50,9 @@
         <logger name="sakugaBotMain" level="all">
             <appender-ref ref="RollingFileInfo"/>
         </logger>
+        <logger name="io.ktor.client.HttpClient" level="all">
+            <appender-ref ref="RollingFileInfo"/>
+        </logger>
         <logger name="sakugaBotMirai" level="all">
             <appender-ref ref="RollingFileMiraiAll"/>
         </logger>

@@ -34,7 +34,7 @@ bot仅群组有效，全局消息发送限制6条一分钟，超出后不响应�
 
 val log = KotlinLogging.logger("sakugaBotMain")
 var leastID = 131261L
-var lastUpdateDay = LocalDate.of(2020, 1, 1)
+var lastUpdateDay = LocalDate.of(2020, 1, 1)!!
 
 var limitTime = System.currentTimeMillis() / 60000
 val limitCounter = AtomicInteger(0)
