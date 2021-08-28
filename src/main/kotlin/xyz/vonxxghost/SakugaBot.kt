@@ -26,10 +26,8 @@ import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.random.Random
 
 const val HELP_MSG = """使用指南
-在群里发送sakugabooru的稿件链接，本账号将自动搜索是否存在微博gif数据，如果存在则发送gif地址到群里，不存在就无反应。
-已支持图片发送功能。
-发出带有“#随机作画”的信息时会随机回复。
-bot仅群组有效，全局消息发送限制6条一分钟，超出后不响应。请不要短期大量占用资源。
+在群里发送sakugabooru的稿件链接，本账号将自动搜索是否存在微博gif数据，如果存在则发送gif地址和图片到群里，不存在就无反应。
+出于账号安全考虑，随机作画功能暂时关闭。
 暂无设置功能，不想看到禁言即可。"""
 
 val log = KotlinLogging.logger("sakugaBotMain")
@@ -142,6 +140,13 @@ fun geneReplyTextAndPicUrl(id: Long): TextAndUrls? {
     return TextAndUrls(replyText, urls.take(1))
 }
 
+fun riskProcessUrl(url: String): String {
+    return url.trim()
+        .replaceFirst(".", "\u200b.")
+        .replaceFirst(Regex("(?<=[^\u200b])\\."), "\u200b.")
+        .replace(Regex("^https?://"), "")
+}
+
 fun geneReplyTextAndPicUrl(message: MessageChain): TextAndUrls {
     val replyText = StringBuilder()
     val urls = mutableListOf<String>()
@@ -153,7 +158,10 @@ fun geneReplyTextAndPicUrl(message: MessageChain): TextAndUrls {
             val copyright = post.copyright()
             val artist = post.artist()
             urls.add(post.weibo.img_url)
-            replyText.append("${post.id}:\n$copyright ${post.source} $artist\n${post.weibo.img_url}\n")
+            replyText.append(
+                "${post.id}:\n$copyright ${post.source} $artist\n" +
+                        "${riskProcessUrl(post.weibo.img_url)}\n"
+            )
         }
     }
 
@@ -209,13 +217,15 @@ suspend fun main() {
             val dat = geneReplyTextAndPicUrl(message)
 
             if (dat.text.isNotEmpty()) {
-                subject.sendMessage(dat.text)
-            }
-            for (url in dat.urls) {
-                val result = httpClient.get<ByteArray> {
-                    url(url)
+                val sentMsg = subject.sendMessage(dat.text)
+                for (url in dat.urls) {
+                    val result = httpClient.get<ByteArray> {
+                        url(url)
+                    }
+                    val uploadedImg = subject.uploadImage(result.toExternalResource())
+                    // 引用回复如果纯图片不会被解析成引用，加个不可见字符
+                    subject.sendMessage(sentMsg.quote().plus("\u200b").plus(uploadedImg))
                 }
-                subject.sendImage(result.toExternalResource())
             }
         }
 
@@ -232,29 +242,29 @@ suspend fun main() {
         always {
             log.info {
                 "组[${group.id}][${group.name}]人[${sender.id}][${sender.nameCardOrNick}]: " +
-                        message.contentToString()
+                        message.toString()
             }
         }
 
-        contains("#随机作画") {
-            if (!checkLimit()) {
-                return@contains
-            }
-
-            if (updateUpdateDay()) {
-                updateLeastPostId() // 每日更新
-            }
-            for (i in 0..5) {
-                val id = getRandomPostId()
-                log.info { "随机尝试id：$id" }
-                val dat = geneReplyTextAndPicUrl(id) ?: continue
-
-                if (dat.text.isNotEmpty()) {
-                    subject.sendMessage(message.quote() + ("Random-" + dat.text))
-                }
-                break
-            }
-        }
+//        contains("#随机作画") {
+//            if (!checkLimit()) {
+//                return@contains
+//            }
+//
+//            if (updateUpdateDay()) {
+//                updateLeastPostId() // 每日更新
+//            }
+//            for (i in 0..5) {
+//                val id = getRandomPostId()
+//                log.info { "随机尝试id：$id" }
+//                val dat = geneReplyTextAndPicUrl(id) ?: continue
+//
+//                if (dat.text.isNotEmpty()) {
+//                    subject.sendMessage(message.quote() + ("Random-" + dat.text))
+//                }
+//                break
+//            }
+//        }
     }
 
     bot.eventChannel.subscribeAlways<ImageUploadEvent.Failed> {
